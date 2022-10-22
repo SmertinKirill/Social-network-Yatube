@@ -1,8 +1,14 @@
 from django.test import TestCase
 from django.contrib.auth import get_user_model
+
 from posts.models import Group, Post
 
 User = get_user_model()
+
+TEST_TITLE = 'Тестовый title'
+TEST_SLUG = 'Тестовый slug'
+TEST_DESC = 'Тестовый description'
+TEST_TEXT = 'Тестовый text'
 
 
 class PostModelTest(TestCase):
@@ -11,13 +17,13 @@ class PostModelTest(TestCase):
         super().setUpClass()
         cls.user = User.objects.create_user(username='auth')
         cls.group = Group.objects.create(
-            title='Тестовая группа',
-            slug='Тестовый слаг',
-            description='Тестовое описание',
+            title=TEST_TITLE,
+            slug=TEST_SLUG,
+            description=TEST_DESC,
         )
         cls.post = Post.objects.create(
             author=cls.user,
-            text='Тестовый пост',
+            text=TEST_TEXT,
         )
 
     def test_models_have_correct_object_names(self):
@@ -58,13 +64,13 @@ class GroupModelTest(TestCase):
         super().setUpClass()
         cls.user = User.objects.create_user(username='auth')
         cls.group = Group.objects.create(
-            title='Тестовая группа',
-            slug='Тестовый слаг',
-            description='Тестовое описание',
+            title=TEST_TITLE,
+            slug=TEST_SLUG,
+            description=TEST_DESC,
         )
         cls.post = Post.objects.create(
             author=cls.user,
-            text='Тестовый пост',
+            text=TEST_TEXT,
         )
 
     def test_models_have_correct_object_names2(self):

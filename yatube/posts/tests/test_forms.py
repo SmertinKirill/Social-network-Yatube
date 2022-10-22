@@ -2,15 +2,21 @@ import shutil
 import tempfile
 
 from django.test import TestCase, Client, override_settings
-from posts.models import Post, Group
-from posts.forms import PostForm
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from django.core.files.uploadedfile import SimpleUploadedFile
+
+from posts.models import Post, Group, Comment
+from posts.forms import PostForm
+
 User = get_user_model()
 
 TEMP_MEDIA_ROOT = tempfile.mkdtemp(dir=settings.BASE_DIR)
+
+FORM_DATA_TEXT = 'test'
+UPLOADED_NAME = 'small.gif'
+TEST = 'test'
 
 
 @override_settings(MEDIA_ROOT=TEMP_MEDIA_ROOT)
@@ -43,8 +49,16 @@ class PostCreateFormTests(TestCase):
 
     def setUp(self):
         # Создаем авторизованый клиент
+        self.guest_client = Client()
         self.authorized_client = Client()
         self.authorized_client.force_login(self.user)
+        self.POST_EDIT_REV = reverse('posts:post_edit',
+                                     kwargs={'post_id': self.post.id})
+        self.POST_DETAIL_REV = reverse('posts:post_detail',
+                                       kwargs={'post_id': self.post.id})
+        self.PROFILE_REV = reverse('posts:profile',
+                                   kwargs={'username': self.user})
+        self.POST_CREATE_REV = reverse('posts:post_create')
 
     def test_create_post(self):
         """Проверка создания постов."""
@@ -58,7 +72,7 @@ class PostCreateFormTests(TestCase):
             b'\x0A\x00\x3B'
         )
         uploaded = SimpleUploadedFile(
-            name='small.gif',
+            name=UPLOADED_NAME,
             content=small_gif,
             content_type='image/gif'
         )
@@ -68,15 +82,14 @@ class PostCreateFormTests(TestCase):
             'image': uploaded,
         }
         response = self.authorized_client.post(
-            reverse('posts:post_create'),
+            self.POST_CREATE_REV,
             data=form_data,
             follow=True
         )
-        self.assertTrue(Post.objects.filter(text='test',
-                                            image='posts/small.gif',
+        self.assertTrue(Post.objects.filter(text=FORM_DATA_TEXT,
+                                            image='posts/' + UPLOADED_NAME,
                                             group=self.group.id).exists())
-        self.assertRedirects(response, reverse('posts:profile',
-                             kwargs={'username': self.user}))
+        self.assertRedirects(response, self.PROFILE_REV)
         self.assertEqual(Post.objects.count(), post_count + 1)
 
     def test_edit_post(self):
@@ -87,12 +100,44 @@ class PostCreateFormTests(TestCase):
             'group': self.group_2.id
         }
         response = self.authorized_client.post(
-            reverse('posts:post_edit', kwargs={'post_id': self.post.id}),
+            self.POST_EDIT_REV,
             data=form_data,
             follow=True
         )
-        self.assertRedirects(response, reverse('posts:post_detail',
-                             kwargs={'post_id': self.post.id}))
+        self.assertRedirects(response, self.POST_DETAIL_REV)
         self.assertNotEqual(self.post.text, form_data['text'])
         self.assertEqual(Post.objects.filter(group=self.group.id).count(),
                          post_count - 1)
+
+    # Проверка работы комментариев
+    def test_comment_correct(self):
+        """Комментировать посты может только авторизованный пользователь."""
+        comments_count = Comment.objects.filter(post=self.post.id).count()
+        form_data = {
+            'text': 'test',
+        }
+        response = self.authorized_client.post(
+            reverse('posts:add_comment', kwargs={'post_id': self.post.id}),
+            data=form_data,
+            follow=True
+        )
+        self.assertTrue(Comment.objects.filter(text='test',).exists())
+        self.assertEqual(comments_count,
+                         Comment.objects.filter(post=self.post.id).count() - 1)
+        self.assertRedirects(response, f'/posts/{self.post.id}/')
+
+    def test_comment_correct(self):
+        """Комментировать посты  неавторизованный пользователь не может."""
+        comments_count = Comment.objects.filter(post=self.post.id).count()
+        form_data = {
+            'text': 'test',
+        }
+        response = self.guest_client.post(
+            reverse('posts:add_comment', kwargs={'post_id': self.post.id}),
+            data=form_data,
+            follow=True
+        )
+        self.assertEqual(comments_count,
+                         Comment.objects.filter(post=self.post.id).count())
+        self.assertRedirects(
+            response, f'/auth/login/?next=/posts/{self.post.id}/comment/')

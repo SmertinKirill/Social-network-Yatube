@@ -1,9 +1,10 @@
 from django.core.paginator import Paginator
 from django.shortcuts import render, get_object_or_404, redirect
-from .models import Post, Group, Follow
 from django.contrib.auth import get_user_model
-from .forms import PostForm, CommentForm
 from django.contrib.auth.decorators import login_required
+
+from .models import Post, Group, Follow
+from .forms import PostForm, CommentForm
 
 LIMIT = 10
 User = get_user_model()
@@ -19,7 +20,7 @@ def get_paginator(post_list, request):
 
 
 def index(request) -> str:
-    context = get_paginator(Post.objects.all(), request)
+    context = get_paginator(Post.objects.select_related('group'), request)
     return render(request, 'posts/index.html', context)
 
 
@@ -124,11 +125,8 @@ def follow_index(request):
 @login_required
 def profile_follow(request, username):
     author = get_object_or_404(User, username=username)
-    if request.user != author and not Follow.objects.filter(
-        user=request.user.id,
-        author=author,
-    ).exists():
-        Follow.objects.create(
+    if request.user != author:
+        Follow.objects.get_or_create(
             user=request.user,
             author=author,
         )
