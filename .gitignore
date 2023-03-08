@@ -148,5 +148,5 @@ dmypy.json
 # папки со статикой и медиа
 # yatube/posts/static/
 # yatube/media/
-yatube/static/admin/
+static/admin/
 yatube_backup.dump
